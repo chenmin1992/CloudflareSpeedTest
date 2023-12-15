@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"runtime"
 	"time"
 
@@ -67,6 +69,9 @@ https://github.com/XIU2/CloudflareSpeedTest
         禁用下载测速；禁用后测速结果会按延迟排序 (默认按下载速度排序)；(默认 启用)
     -allip
         测速全部的IP；对 IP 段中的每个 IP (仅支持 IPv4) 进行测速；(默认 每个 /24 段随机测速一个 IP)
+        
+    -db
+        IP地理位置数据库文件，从 https://dev.maxmind.com/geoip/geolite2-free-geolocation-data 下载
 
     -v
         打印程序版本 + 检查版本更新
@@ -98,6 +103,8 @@ https://github.com/XIU2/CloudflareSpeedTest
 
 	flag.BoolVar(&task.Disable, "dd", false, "禁用下载测速")
 	flag.BoolVar(&task.TestAll, "allip", false, "测速全部 IP")
+    
+	flag.StringVar(&task.IP2GeoDBFile, "db", "GeoLite2-City.mmdb", "IP地理位置数据库文件")
 
 	flag.BoolVar(&printVersion, "v", false, "打印程序版本")
 	flag.Usage = func() { fmt.Print(help) }
@@ -129,13 +136,20 @@ func main() {
 	task.InitRandSeed() // 置随机数种子
 
 	fmt.Printf("# XIU2/CloudflareSpeedTest %s \n\n", version)
+	
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		task.Stop = true
+	}()
 
 	// 开始延迟测速 + 过滤延迟/丢包
 	pingData := task.NewPing().Run().FilterDelay().FilterLossRate()
 	// 开始下载测速
 	speedData := task.TestDownloadSpeed(pingData)
-	utils.ExportCsv(speedData) // 输出文件
 	speedData.Print()          // 打印结果
+	utils.ExportCsv(speedData) // 输出文件
 
 	if versionNew != "" {
 		fmt.Printf("\n*** 发现新版本 [%s]！请前往 [https://github.com/XIU2/CloudflareSpeedTest] 更新！ ***\n", versionNew)

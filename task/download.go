@@ -9,10 +9,13 @@ import (
 	"sort"
 	"strconv"
 	"time"
+	"log"
 
 	"github.com/XIU2/CloudflareSpeedTest/utils"
 
 	"github.com/VividCortex/ewma"
+
+	"github.com/oschwald/geoip2-golang"
 )
 
 const (
@@ -22,6 +25,7 @@ const (
 	defaultDisableDownload         = false
 	defaultTestNum                 = 10
 	defaultMinSpeed        float64 = 0.0
+	defaultIP2GeoDBFile            = "GeoLite2-City.mmdb"
 )
 
 var (
@@ -31,6 +35,9 @@ var (
 
 	TestCount = defaultTestNum
 	MinSpeed  = defaultMinSpeed
+
+	IP2GeoDBFile = defaultIP2GeoDBFile
+	Stop         = false
 )
 
 func checkDownloadDefault() {
@@ -72,20 +79,42 @@ func TestDownloadSpeed(ipSet utils.PingDelaySet) (speedSet utils.DownloadSpeedSe
 	for i := 0; i < bar_a; i++ {
 		bar_b += " "
 	}
-	bar := utils.NewBar(TestCount, bar_b, "")
+	// bar := utils.NewBar(TestCount, bar_b, "")
+	db, err := geoip2.Open(IP2GeoDBFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+	headFormat := "%-16s%-5s%-5s%-5s%-6s%-14s%-16s%-16s%-8s%-8s\n"
+	dataFormat := "%-18s%-8s%-8s%-8s%-10s%-18s%-18s%-18s%-10s%-10s\n"
+	fmt.Printf(headFormat, "IP 地址", "已发送", "已接收", "丢包率", "平均延迟", "下载速度 (MB/s)", "国家", "城市", "纬度", "经度")
 	for i := 0; i < testNum; i++ {
+		if Stop {
+			break
+		}
 		speed := downloadHandler(ipSet[i].IP)
 		ipSet[i].DownloadSpeed = speed
+		ip := net.ParseIP(ipSet[i].IP.String())
+		record, err := db.City(ip)
+		if err != nil {
+			log.Println(err)
+		}
+		ipSet[i].Country = record.Country.Names["en"]
+		ipSet[i].City = record.City.Names["en"]
+		ipSet[i].Latitude = record.Location.Latitude
+		ipSet[i].Longitude = record.Location.Longitude
+		ss := ipSet[i].ToString()
+		fmt.Printf(dataFormat, ss[0], ss[1], ss[2], ss[3], ss[4], ss[5], ss[6], ss[7], ss[8], ss[9])
 		// 在每个 IP 下载测速后，以 [下载速度下限] 条件过滤结果
 		if speed >= MinSpeed*1024*1024 {
-			bar.Grow(1, "")
+			// bar.Grow(1, "")
 			speedSet = append(speedSet, ipSet[i]) // 高于下载速度下限时，添加到新数组中
 			if len(speedSet) == TestCount {       // 凑够满足条件的 IP 时（下载测速数量 -dn），就跳出循环
 				break
 			}
 		}
 	}
-	bar.Done()
+	// bar.Done()
 	if len(speedSet) == 0 { // 没有符合速度限制的数据，返回所有测试数据
 		speedSet = utils.DownloadSpeedSet(ipSet)
 	}
@@ -160,6 +189,9 @@ func downloadHandler(ip *net.IPAddr) float64 {
 			nextTime = timeStart.Add(timeSlice * time.Duration(timeCounter))
 			e.Add(float64(contentRead - lastContentRead))
 			lastContentRead = contentRead
+		}
+		if Stop {
+			break
 		}
 		// 如果超出下载测速时间，则退出循环（终止测速）
 		if currentTime.After(timeEnd) {
