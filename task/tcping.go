@@ -104,9 +104,9 @@ func (p *Ping) tcping(ip *net.IPAddr) (bool, time.Duration) {
 }
 
 // pingReceived pingTotalTime
-func (p *Ping) checkConnection(ip *net.IPAddr) (recv int, totalDelay time.Duration) {
+func (p *Ping) checkConnection(ip *net.IPAddr) (recv int, totalDelay time.Duration, cfColo string) {
 	if Httping {
-		recv, totalDelay = p.httping(ip)
+		recv, totalDelay, cfColo = p.httping(ip)
 		return
 	}
 	for i := 0; i < PingTimes; i++ {
@@ -115,6 +115,7 @@ func (p *Ping) checkConnection(ip *net.IPAddr) (recv int, totalDelay time.Durati
 			totalDelay += delay
 		}
 	}
+	cfColo = ""
 	return
 }
 
@@ -128,7 +129,7 @@ func (p *Ping) appendIPData(data *utils.PingData) {
 
 // handle tcping
 func (p *Ping) tcpingHandler(ip *net.IPAddr) {
-	recv, totalDlay := p.checkConnection(ip)
+	recv, totalDlay, cfColo := p.checkConnection(ip)
 	nowAble := len(p.csv)
 	if recv != 0 {
 		nowAble++
@@ -142,6 +143,7 @@ func (p *Ping) tcpingHandler(ip *net.IPAddr) {
 		Sended:   PingTimes,
 		Received: recv,
 		Delay:    totalDlay / time.Duration(recv),
+		CFColo:   cfColo,
 	}
 	p.appendIPData(data)
 }

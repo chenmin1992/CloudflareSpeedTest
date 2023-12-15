@@ -85,9 +85,9 @@ func TestDownloadSpeed(ipSet utils.PingDelaySet) (speedSet utils.DownloadSpeedSe
 		log.Fatal(err)
 	}
 	defer db.Close()
-	headFormat := "%-16s%-5s%-5s%-5s%-6s%-14s%-16s%-16s%-8s%-8s\n"
-	dataFormat := "%-18s%-8s%-8s%-8s%-10s%-18s%-18s%-18s%-10s%-10s\n"
-	fmt.Printf(headFormat, "IP 地址", "已发送", "已接收", "丢包率", "平均延迟", "下载速度 (MB/s)", "国家", "城市", "纬度", "经度")
+	headFormat := "%-16s%-5s%-5s%-5s%-6s%-14s%-16s%-16s%-8s%-8s%-8s\n"
+	dataFormat := "%-18s%-8s%-8s%-8s%-10s%-18s%-18s%-18s%-10s%-10s%-10s\n"
+	fmt.Printf(headFormat, "IP 地址", "已发送", "已接收", "丢包率", "平均延迟", "下载速度 (MB/s)", "国家", "城市", "纬度", "经度", "CFColo")
 	for i := 0; i < testNum; i++ {
 		if Stop {
 			break
@@ -104,7 +104,7 @@ func TestDownloadSpeed(ipSet utils.PingDelaySet) (speedSet utils.DownloadSpeedSe
 		ipSet[i].Latitude = record.Location.Latitude
 		ipSet[i].Longitude = record.Location.Longitude
 		ss := ipSet[i].ToString()
-		fmt.Printf(dataFormat, ss[0], ss[1], ss[2], ss[3], ss[4], ss[5], ss[6], ss[7], ss[8], ss[9])
+		fmt.Printf(dataFormat, ss[0], ss[1], ss[2], ss[3], ss[4], ss[5], ss[6], ss[7], ss[8], ss[9], ss[10])
 		// 在每个 IP 下载测速后，以 [下载速度下限] 条件过滤结果
 		if speed >= MinSpeed*1024*1024 {
 			// bar.Grow(1, "")
